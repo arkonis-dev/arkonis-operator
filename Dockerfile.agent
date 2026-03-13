@@ -1,0 +1,32 @@
+# Dockerfile.agent — builds the agent runtime image that runs inside agent pods.
+# The operator manager uses the kubebuilder-generated Dockerfile at root.
+
+# Build stage
+FROM golang:1.25-alpine AS builder
+
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+
+WORKDIR /workspace
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -a -trimpath -ldflags="-s -w" \
+    -o /agentops-runtime \
+    ./runtime/agent/
+
+# Runtime stage — distroless for minimal attack surface.
+FROM gcr.io/distroless/static:nonroot
+
+COPY --from=builder /agentops-runtime /agentops-runtime
+
+# Health probe and task listener.
+EXPOSE 8080
+
+USER nonroot:nonroot
+
+ENTRYPOINT ["/agentops-runtime"]

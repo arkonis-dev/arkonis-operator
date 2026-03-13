@@ -1,0 +1,82 @@
+# Redis task queue — required by all agent pods.
+#
+# This is a single-replica Redis instance suitable for development and small
+# deployments.  For production, replace with a HA setup (Redis Sentinel /
+# Redis Cluster) or a managed service (ElastiCache, Upstash, etc.) and update
+# TASK_QUEUE_URL in the agentops-operator-api-keys Secret accordingly.
+#
+# Apply:  kubectl apply -f config/prereqs/redis.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agent-infra
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: agent-infra
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/managed-by: agentops-operator
+spec:
+  serviceName: redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          args: ["--save", "60", "1", "--loglevel", "warning"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: agent-infra
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/managed-by: agentops-operator
+spec:
+  selector:
+    app.kubernetes.io/name: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+      protocol: TCP
+  type: ClusterIP

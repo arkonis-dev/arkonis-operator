@@ -1,0 +1,15 @@
+apiVersion: agentops.agentops.io/v1alpha1
+kind: AgentService
+metadata:
+  name: research-service
+  namespace: default
+spec:
+  selector:
+    agentDeployment: research-agent
+  routing:
+    strategy: least-busy
+  ports:
+    - protocol: HTTP
+      port: 8081
+    - protocol: A2A
+      port: 8080

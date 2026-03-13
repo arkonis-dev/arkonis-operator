@@ -1,0 +1,7 @@
+## Append samples of your project ##
+resources:
+- agentops_v1alpha1_agentdeployment.yaml
+- agentops_v1alpha1_agentservice.yaml
+- agentops_v1alpha1_agentconfig.yaml
+- agentops_v1alpha1_agentpipeline.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
