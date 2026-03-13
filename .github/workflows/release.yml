@@ -71,14 +71,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.30.0
-        with:
-          image-ref: ${{ env.OPERATOR_IMAGE }}:${{ github.ref_name }}
-          format: sarif
-          output: trivy-operator.sarif
-          severity: CRITICAL,HIGH
-          exit-code: "0"
+      - name: Install Trivy
+        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run Trivy scan
+        run: |
+          trivy image \
+            --format sarif \
+            --output trivy-operator.sarif \
+            --severity CRITICAL,HIGH \
+            --exit-code 0 \
+            ${{ env.OPERATOR_IMAGE }}:${{ github.ref_name }}
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3
@@ -103,14 +106,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.30.0
-        with:
-          image-ref: ${{ env.AGENT_IMAGE }}:${{ github.ref_name }}
-          format: sarif
-          output: trivy-runtime.sarif
-          severity: CRITICAL,HIGH
-          exit-code: "0"
+      - name: Install Trivy
+        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run Trivy scan
+        run: |
+          trivy image \
+            --format sarif \
+            --output trivy-runtime.sarif \
+            --severity CRITICAL,HIGH \
+            --exit-code 0 \
+            ${{ env.AGENT_IMAGE }}:${{ github.ref_name }}
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3
