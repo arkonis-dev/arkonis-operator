@@ -1,0 +1,15 @@
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkService
+metadata:
+  name: research-service
+  namespace: default
+spec:
+  selector:
+    arkAgent: research-agent
+  routing:
+    strategy: least-busy
+  ports:
+    - protocol: HTTP
+      port: 8081
+    - protocol: A2A
+      port: 8080

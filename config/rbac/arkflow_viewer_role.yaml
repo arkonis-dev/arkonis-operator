@@ -1,0 +1,23 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: ark-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: arkflow-viewer-role
+rules:
+- apiGroups:
+  - arkonis.dev
+  resources:
+  - arkflows
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - arkonis.dev
+  resources:
+  - arkflows/status
+  verbs:
+  - get

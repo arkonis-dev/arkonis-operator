@@ -33,7 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
+	arkonisv1alpha1 "github.com/arkonis-dev/ark-operator/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 

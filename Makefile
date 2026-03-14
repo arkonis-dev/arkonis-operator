@@ -1,7 +1,7 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 # Image URL for the agent runtime (runs inside agent pods)
-AGENT_IMG ?= arkonis-runtime:latest
+AGENT_IMG ?= ark-runtime:latest
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -69,8 +69,8 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 # CertManager is installed by default; skip with:
 # - CERT_MANAGER_INSTALL_SKIP=true
 DEV_CLUSTER  ?= arkonis-dev
-DEV_IMG      ?= arkonis-operator:dev
-DEV_AGENT_IMG ?= arkonis-runtime:dev
+DEV_IMG      ?= ark-operator:dev
+DEV_AGENT_IMG ?= ark-runtime:dev
 
 .PHONY: dev
 dev: manifests generate kustomize ## Start a local dev environment in Kind. Usage: make dev ANTHROPIC_API_KEY=sk-ant-...
@@ -96,15 +96,15 @@ dev: manifests generate kustomize ## Start a local dev environment in Kind. Usag
 	@echo "==> Creating API key secret..."
 	$(KUBECTL) create secret generic arkonis-api-keys \
 		--from-literal=ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
-		--from-literal=TASK_QUEUE_URL=redis.arkonis-infra.svc.cluster.local:6379 \
+		--from-literal=TASK_QUEUE_URL=redis://redis.agent-infra.svc.cluster.local:6379 \
 		--dry-run=client -o yaml | $(KUBECTL) apply -f -
 	@echo "==> Waiting for operator to be ready..."
 	$(KUBECTL) wait --for=condition=available --timeout=120s \
-		deployment/arkonis-controller-manager -n arkonis-system
+		deployment/arkonis-controller-manager -n ark-system
 	@echo ""
 	@echo "Dev environment ready."
-	@echo "  kubectl apply -f config/samples/arkonis_v1alpha1_arkonisdeployment.yaml"
-	@echo "  kubectl get aodep -w"
+	@echo "  kubectl apply -f config/samples/arkonis_v1alpha1_arkagent.yaml"
+	@echo "  kubectl get arkagents -w"
 	@echo ""
 	@echo "Tear down: make dev-down"
 
@@ -156,8 +156,19 @@ build: manifests generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/main.go
 
 .PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go --agent-image=$(AGENT_IMG)
+WEBHOOK_ADDR   ?= :8092
+WEBHOOK_URL    ?= http://localhost:8092
+REDIS_LOCAL    ?= redis://localhost:6379
+
+run: manifests generate fmt vet ## Run operator locally against current kube context.
+	@kubectl port-forward svc/redis 6379:6379 &>/tmp/arkonis-redis-pf.log & PF_PID=$$!; \
+	trap "kill $$PF_PID 2>/dev/null" EXIT INT TERM; \
+	sleep 1; \
+	TASK_QUEUE_URL=$(REDIS_LOCAL) \
+	go run ./cmd/main.go \
+		--agent-image=$(AGENT_IMG) \
+		--trigger-webhook-addr=$(WEBHOOK_ADDR) \
+		--trigger-webhook-url=$(WEBHOOK_URL)
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.

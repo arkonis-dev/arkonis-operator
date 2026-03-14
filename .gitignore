@@ -28,3 +28,9 @@ go.work
 
 # Kubeconfig might contain secrets
 *.kubeconfig
+
+# Build artifacts
+dist/
+
+# Compiled agent binary (built via Dockerfile.agent)
+/agent

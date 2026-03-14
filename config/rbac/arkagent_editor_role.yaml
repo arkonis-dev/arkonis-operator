@@ -1,0 +1,27 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: ark-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: arkagent-editor-role
+rules:
+- apiGroups:
+  - arkonis.dev
+  resources:
+  - arkagents
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - arkonis.dev
+  resources:
+  - arkagents/status
+  verbs:
+  - get

@@ -1,0 +1,18 @@
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkEvent
+metadata:
+  name: post-etl-trigger
+  namespace: default
+spec:
+  source:
+    type: pipeline-output
+    pipelineOutput:
+      name: etl-pipeline     # watch this ArkFlow
+      onPhase: Succeeded     # fire when it succeeds (default)
+  targets:
+    - pipeline: analytics-pipeline
+      input:
+        # Pass the upstream flow's output to the downstream flow
+        etlOutput: "{{ .trigger.output }}"
+  concurrencyPolicy: Forbid
+  suspended: false

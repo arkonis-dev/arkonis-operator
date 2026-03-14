@@ -6,8 +6,8 @@ cliVersion: 4.13.0
 domain: arkonis.dev
 layout:
 - go.kubebuilder.io/v4
-projectName: arkonis-operator
-repo: github.com/arkonis-dev/arkonis-operator
+projectName: ark-operator
+repo: github.com/arkonis-dev/ark-operator
 resources:
 - api:
     crdVersion: v1
@@ -15,8 +15,8 @@ resources:
   controller: true
   domain: arkonis.dev
   group: arkonis
-  kind: ArkonisDeployment
-  path: github.com/arkonis-dev/arkonis-operator/api/v1alpha1
+  kind: ArkAgent
+  path: github.com/arkonis-dev/ark-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -24,8 +24,8 @@ resources:
   controller: true
   domain: arkonis.dev
   group: arkonis
-  kind: ArkonisService
-  path: github.com/arkonis-dev/arkonis-operator/api/v1alpha1
+  kind: ArkService
+  path: github.com/arkonis-dev/ark-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -33,8 +33,8 @@ resources:
   controller: true
   domain: arkonis.dev
   group: arkonis
-  kind: ArkonisConfig
-  path: github.com/arkonis-dev/arkonis-operator/api/v1alpha1
+  kind: ArkSettings
+  path: github.com/arkonis-dev/ark-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -42,8 +42,8 @@ resources:
   controller: true
   domain: arkonis.dev
   group: arkonis
-  kind: ArkonisPipeline
-  path: github.com/arkonis-dev/arkonis-operator/api/v1alpha1
+  kind: ArkFlow
+  path: github.com/arkonis-dev/ark-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -51,7 +51,16 @@ resources:
   controller: true
   domain: arkonis.dev
   group: arkonis
-  kind: ArkonisMemory
-  path: github.com/arkonis-dev/arkonis-operator/api/v1alpha1
+  kind: ArkMemory
+  path: github.com/arkonis-dev/ark-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: arkonis.dev
+  group: arkonis
+  kind: ArkEvent
+  path: github.com/arkonis-dev/ark-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

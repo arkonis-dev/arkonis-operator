@@ -17,8 +17,10 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
+	"net/http"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -35,8 +37,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	arkonisv1alpha1 "github.com/arkonis-dev/arkonis-operator/api/v1alpha1"
-	"github.com/arkonis-dev/arkonis-operator/internal/controller"
+	arkonisv1alpha1 "github.com/arkonis-dev/ark-operator/api/v1alpha1"
+	"github.com/arkonis-dev/ark-operator/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -52,6 +54,33 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+// webhookRunnable wraps an http.Handler as a controller-runtime Runnable so it
+// shares the manager lifecycle (started and gracefully shut down together).
+type webhookRunnable struct {
+	addr    string
+	handler http.Handler
+}
+
+func triggerWebhookRunnable(addr string, handler http.Handler) *webhookRunnable {
+	return &webhookRunnable{addr: addr, handler: handler}
+}
+
+func (r *webhookRunnable) Start(ctx context.Context) error {
+	srv := &http.Server{Addr: r.addr, Handler: r.handler}
+	errCh := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		return srv.Shutdown(context.Background()) //nolint:contextcheck
+	case err := <-errCh:
+		return err
+	}
+}
+
 // nolint:gocyclo
 func main() {
 	var metricsAddr string
@@ -62,6 +91,8 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var agentImage string
+	var triggerWebhookAddr string
+	var triggerWebhookURL string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -80,8 +111,13 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.StringVar(&agentImage, "agent-image", "ghcr.io/arkonis-dev/arkonis-runtime:latest",
+	flag.StringVar(&agentImage, "agent-image", "ghcr.io/arkonis-dev/ark-runtime:latest",
 		"Container image used for agent runtime pods.")
+	flag.StringVar(&triggerWebhookAddr, "trigger-webhook-addr", ":8092",
+		"Address for the ArkEvent webhook HTTP server to listen on.")
+	flag.StringVar(&triggerWebhookURL, "trigger-webhook-url", "",
+		"Base URL of the trigger webhook server, e.g. http://ark-operator.ark-system.svc.cluster.local:8092. "+
+			"Written to webhook-type ArkEvent status.webhookURL.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -181,43 +217,63 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.ArkonisDeploymentReconciler{
+	if err := (&controller.ArkAgentReconciler{
 		Client:     mgr.GetClient(),
 		Scheme:     mgr.GetScheme(),
 		AgentImage: agentImage,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "ArkonisDeployment")
+		setupLog.Error(err, "Failed to create controller", "controller", "ArkAgent")
 		os.Exit(1)
 	}
-	if err := (&controller.ArkonisServiceReconciler{
+	if err := (&controller.ArkServiceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "ArkonisService")
+		setupLog.Error(err, "Failed to create controller", "controller", "ArkService")
 		os.Exit(1)
 	}
-	if err := (&controller.ArkonisConfigReconciler{
+	if err := (&controller.ArkSettingsReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "ArkonisConfig")
+		setupLog.Error(err, "Failed to create controller", "controller", "ArkSettings")
 		os.Exit(1)
 	}
-	if err := (&controller.ArkonisPipelineReconciler{
+	if err := (&controller.ArkFlowReconciler{
 		Client:       mgr.GetClient(),
 		Scheme:       mgr.GetScheme(),
 		TaskQueueURL: os.Getenv("TASK_QUEUE_URL"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "ArkonisPipeline")
+		setupLog.Error(err, "Failed to create controller", "controller", "ArkFlow")
 		os.Exit(1)
 	}
-	if err := (&controller.ArkonisMemoryReconciler{
+	if err := (&controller.ArkMemoryReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "ArkonisMemory")
+		setupLog.Error(err, "Failed to create controller", "controller", "ArkMemory")
 		os.Exit(1)
 	}
+
+	triggerReconciler := &controller.ArkEventReconciler{
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		TriggerWebhookURL: triggerWebhookURL,
+	}
+	if err := triggerReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "ArkEvent")
+		os.Exit(1)
+	}
+
+	// Start the trigger webhook HTTP server as a manager Runnable so it
+	// shares the manager's lifecycle (graceful shutdown on signal).
+	webhookSrv := controller.NewTriggerWebhookServer(triggerReconciler)
+	if err := mgr.Add(triggerWebhookRunnable(triggerWebhookAddr, webhookSrv)); err != nil {
+		setupLog.Error(err, "Failed to add trigger webhook server to manager")
+		os.Exit(1)
+	}
+	setupLog.Info("Trigger webhook server registered", "addr", triggerWebhookAddr)
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

@@ -30,11 +30,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/arkonis-dev/arkonis-operator/test/utils"
+	"github.com/arkonis-dev/ark-operator/test/utils"
 )
 
 // namespace where the project is deployed in
-const namespace = "arkonis-system"
+const namespace = "ark-system"
 
 // serviceAccountName created for the project
 const serviceAccountName = "arkonis-controller-manager"
@@ -270,13 +270,13 @@ var _ = Describe("Manager", Ordered, func() {
 
 		// +kubebuilder:scaffold:e2e-webhooks-checks
 
-		It("should reconcile an ArkonisDeployment and create a backing Deployment", func() {
-			const arkonisDepName = "e2e-research-agent"
+		It("should reconcile an ArkAgent and create a backing Deployment", func() {
+			const arkAgentName = "e2e-research-agent"
 
-			By("applying a sample ArkonisDeployment CR")
+			By("applying a sample ArkAgent CR")
 			sampleYAML := fmt.Sprintf(`
 apiVersion: arkonis.dev/v1alpha1
-kind: ArkonisDeployment
+kind: ArkAgent
 metadata:
   name: %s
   namespace: %s
@@ -284,50 +284,50 @@ spec:
   replicas: 1
   model: claude-haiku-4-5-20251001
   systemPrompt: "You are a research agent."
-`, arkonisDepName, namespace)
-			sampleFile := filepath.Join(os.TempDir(), "e2e-arkonisdeployment.yaml")
+`, arkAgentName, namespace)
+			sampleFile := filepath.Join(os.TempDir(), "e2e-arkagent.yaml")
 			Expect(os.WriteFile(sampleFile, []byte(sampleYAML), 0o644)).To(Succeed())
 
 			cmd := exec.Command("kubectl", "apply", "-f", sampleFile)
 			_, err := utils.Run(cmd)
-			Expect(err).NotTo(HaveOccurred(), "Failed to apply ArkonisDeployment")
+			Expect(err).NotTo(HaveOccurred(), "Failed to apply ArkAgent")
 
 			By("waiting for the backing k8s Deployment to be created")
 			verifyDeploymentCreated := func(g Gomega) {
 				cmd := exec.Command("kubectl", "get", "deployment",
-					arkonisDepName+"-agent", "-n", namespace,
+					arkAgentName+"-agent", "-n", namespace,
 					"-o", "jsonpath={.metadata.name}")
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(Equal(arkonisDepName + "-agent"))
+				g.Expect(output).To(Equal(arkAgentName + "-agent"))
 			}
 			Eventually(verifyDeploymentCreated).Should(Succeed())
 
-			By("verifying the reconcile success metric is non-zero for arkonisdeployment")
+			By("verifying the reconcile success metric is non-zero for arkagent")
 			verifyReconcileMetric := func(g Gomega) {
 				metricsOutput, err := getMetricsOutput()
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(metricsOutput).To(ContainSubstring(
-					`controller_runtime_reconcile_total{controller="arkonisdeployment"`,
+					`controller_runtime_reconcile_total{controller="arkagent"`,
 				))
 			}
 			Eventually(verifyReconcileMetric).Should(Succeed())
 
-			By("cleaning up the ArkonisDeployment")
-			cmd = exec.Command("kubectl", "delete", "arkonisdeployment", arkonisDepName, "-n", namespace)
+			By("cleaning up the ArkAgent")
+			cmd = exec.Command("kubectl", "delete", "arkagent", arkAgentName, "-n", namespace)
 			_, _ = utils.Run(cmd)
 		})
 
-		It("should reconcile an ArkonisService and create a backing k8s Service", func() {
+		It("should reconcile an ArkService and create a backing k8s Service", func() {
 			const (
-				arkonisDepName = "e2e-service-backing-agent"
+				arkAgentName   = "e2e-service-backing-agent"
 				arkonisSvcName = "e2e-arkonis-service"
 			)
 
-			By("creating a backing ArkonisDeployment")
+			By("creating a backing ArkAgent")
 			depYAML := fmt.Sprintf(`
 apiVersion: arkonis.dev/v1alpha1
-kind: ArkonisDeployment
+kind: ArkAgent
 metadata:
   name: %s
   namespace: %s
@@ -335,34 +335,34 @@ spec:
   replicas: 1
   model: claude-haiku-4-5-20251001
   systemPrompt: "You are helpful."
-`, arkonisDepName, namespace)
-			depFile := filepath.Join(os.TempDir(), "e2e-svc-dep.yaml")
+`, arkAgentName, namespace)
+			depFile := filepath.Join(os.TempDir(), "e2e-svc-arkagent.yaml")
 			Expect(os.WriteFile(depFile, []byte(depYAML), 0o644)).To(Succeed())
 			cmd := exec.Command("kubectl", "apply", "-f", depFile)
 			_, err := utils.Run(cmd)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("applying a sample ArkonisService CR")
+			By("applying a sample ArkService CR")
 			svcYAML := fmt.Sprintf(`
 apiVersion: arkonis.dev/v1alpha1
-kind: ArkonisService
+kind: ArkService
 metadata:
   name: %s
   namespace: %s
 spec:
   selector:
-    arkonisDeployment: %s
+    arkAgent: %s
   routing:
     strategy: round-robin
   ports:
     - protocol: HTTP
       port: 8081
-`, arkonisSvcName, namespace, arkonisDepName)
-			svcFile := filepath.Join(os.TempDir(), "e2e-arkonisservice.yaml")
+`, arkonisSvcName, namespace, arkAgentName)
+			svcFile := filepath.Join(os.TempDir(), "e2e-arkservice.yaml")
 			Expect(os.WriteFile(svcFile, []byte(svcYAML), 0o644)).To(Succeed())
 			cmd = exec.Command("kubectl", "apply", "-f", svcFile)
 			_, err = utils.Run(cmd)
-			Expect(err).NotTo(HaveOccurred(), "Failed to apply ArkonisService")
+			Expect(err).NotTo(HaveOccurred(), "Failed to apply ArkService")
 
 			By("waiting for the backing k8s Service to be created")
 			verifyServiceCreated := func(g Gomega) {
@@ -376,9 +376,9 @@ spec:
 			Eventually(verifyServiceCreated).Should(Succeed())
 
 			By("cleaning up")
-			cmd = exec.Command("kubectl", "delete", "arkonisservice", arkonisSvcName, "-n", namespace)
+			cmd = exec.Command("kubectl", "delete", "arkservice", arkonisSvcName, "-n", namespace)
 			_, _ = utils.Run(cmd)
-			cmd = exec.Command("kubectl", "delete", "arkonisdeployment", arkonisDepName, "-n", namespace)
+			cmd = exec.Command("kubectl", "delete", "arkagent", arkAgentName, "-n", namespace)
 			_, _ = utils.Run(cmd)
 		})
 	})

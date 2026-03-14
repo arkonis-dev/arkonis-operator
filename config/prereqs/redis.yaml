@@ -19,7 +19,7 @@ metadata:
   namespace: agent-infra
   labels:
     app.kubernetes.io/name: redis
-    app.kubernetes.io/managed-by: arkonis-operator
+    app.kubernetes.io/managed-by: ark-operator
 spec:
   serviceName: redis
   replicas: 1
@@ -70,7 +70,7 @@ metadata:
   namespace: agent-infra
   labels:
     app.kubernetes.io/name: redis
-    app.kubernetes.io/managed-by: arkonis-operator
+    app.kubernetes.io/managed-by: ark-operator
 spec:
   selector:
     app.kubernetes.io/name: redis

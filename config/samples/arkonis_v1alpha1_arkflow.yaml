@@ -1,0 +1,70 @@
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkFlow
+metadata:
+  name: research-then-summarize
+  namespace: default
+spec:
+  # Flow-level timeout: fail the flow if it hasn't finished in 10 minutes.
+  timeoutSeconds: 600
+  input:
+    topic: "AI in healthcare"
+    detailed: "true"
+
+  steps:
+    # Step 1 — unconditional research step.
+    - name: research
+      arkAgent: research-agent
+      inputs:
+        prompt: "Research the following topic thoroughly: {{ .pipeline.input.topic }}"
+      outputSchema: |
+        {
+          "type": "object",
+          "properties": {
+            "summary": { "type": "string" },
+            "sources": { "type": "array", "items": { "type": "string" } },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "required": ["summary", "sources", "confidence"]
+        }
+
+    # Step 2 — conditional: only run detailed analysis when requested.
+    - name: deep-analysis
+      arkAgent: research-agent
+      dependsOn:
+        - research
+      # Only runs when the caller requested a detailed report.
+      if: "{{ eq .pipeline.input.detailed \"true\" }}"
+      inputs:
+        prompt: "Expand on these research findings with deeper analysis:\n\n{{ .steps.research.data.summary }}"
+
+    # Step 3 — loop: keep refining the summary until confidence exceeds 0.8 (max 3 times).
+    - name: refine
+      arkAgent: research-agent
+      dependsOn:
+        - research
+      inputs:
+        prompt: "Improve the clarity and accuracy of this summary: {{ .steps.research.data.summary }}"
+      outputSchema: |
+        {
+          "type": "object",
+          "properties": {
+            "summary": { "type": "string" },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "required": ["summary", "confidence"]
+        }
+      loop:
+        # Keep iterating while confidence is below threshold.
+        condition: "{{ lt (index .steps.refine.data \"confidence\") 0.8 }}"
+        maxIterations: 3
+
+    # Step 4 — final summarisation after all prior steps complete.
+    - name: summarize
+      arkAgent: summarizer-agent
+      dependsOn:
+        - deep-analysis
+        - refine
+      inputs:
+        prompt: "Produce a final executive summary combining these findings:\n\nResearch: {{ .steps.research.data.summary }}\nRefined: {{ .steps.refine.data.summary }}"
+
+  output: "{{ .steps.summarize.output }}"

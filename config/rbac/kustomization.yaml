@@ -22,19 +22,19 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the arkonis itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- arkonispipeline_admin_role.yaml
-- arkonispipeline_editor_role.yaml
-- arkonispipeline_viewer_role.yaml
-- arkonisconfig_admin_role.yaml
-- arkonisconfig_editor_role.yaml
-- arkonisconfig_viewer_role.yaml
+- arkflow_admin_role.yaml
+- arkflow_editor_role.yaml
+- arkflow_viewer_role.yaml
+- arksettings_admin_role.yaml
+- arksettings_editor_role.yaml
+- arksettings_viewer_role.yaml
 - arkonisservice_admin_role.yaml
 - arkonisservice_editor_role.yaml
 - arkonisservice_viewer_role.yaml
-- arkonisdeployment_admin_role.yaml
-- arkonisdeployment_editor_role.yaml
-- arkonisdeployment_viewer_role.yaml
-- arkonismemory_admin_role.yaml
-- arkonismemory_editor_role.yaml
-- arkonismemory_viewer_role.yaml
+- arkagent_admin_role.yaml
+- arkagent_editor_role.yaml
+- arkagent_viewer_role.yaml
+- arkmemory_admin_role.yaml
+- arkmemory_editor_role.yaml
+- arkmemory_viewer_role.yaml
 

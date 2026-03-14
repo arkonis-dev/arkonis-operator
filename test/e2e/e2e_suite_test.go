@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/arkonis-dev/arkonis-operator/test/utils"
+	"github.com/arkonis-dev/ark-operator/test/utils"
 )
 
 var (

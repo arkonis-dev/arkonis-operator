@@ -6,12 +6,23 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/config"
+	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/health"
+	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/mcp"
+	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/providers"
+	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/queue"
+	"github.com/arkonis-dev/ark-operator/runtime/agent/internal/runner"
+
+	// Register LLM provider implementations via their init() functions.
+	_ "github.com/arkonis-dev/ark-operator/runtime/agent/internal/providers/anthropic"
+	_ "github.com/arkonis-dev/ark-operator/runtime/agent/internal/providers/openai"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	cfg, err := LoadConfig()
+	cfg, err := config.Load()
 	if err != nil {
 		logger.Error("failed to load config", "error", err)
 		os.Exit(1)
@@ -19,34 +30,36 @@ func main() {
 
 	// Connect to MCP servers and discover tools.
 	// Failures are non-fatal: the agent runs with whatever tools were successfully discovered.
-	mcpManager, err := NewMCPManager(cfg.MCPServers)
+	mcpManager, err := mcp.NewManager(cfg.MCPServers)
 	if err != nil {
 		logger.Warn("one or more MCP servers unavailable, continuing with reduced toolset", "error", err)
-		mcpManager = &MCPManager{}
+		mcpManager, _ = mcp.NewManager(nil)
 	}
 	defer mcpManager.Close()
 
-	provider, err := NewProvider(cfg.Provider)
+	provider, err := providers.New(cfg.Provider)
 	if err != nil {
 		logger.Error("unsupported LLM provider", "provider", cfg.Provider, "error", err)
 		os.Exit(1)
 	}
 
-	runner := NewRunner(cfg, mcpManager, provider)
+	// Queue must be created before runner so submit_subtask is available as a built-in tool.
+	q := queue.New(cfg.TaskQueueURL, cfg.MaxRetries)
+	defer q.Close()
 
-	queue := NewTaskQueue(cfg.TaskQueueURL, cfg.MaxRetries)
-	defer queue.Close()
+	r := runner.New(cfg, mcpManager, provider, q)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
 	logger.Info("agent runtime started",
 		"model", cfg.Model,
+		"provider", cfg.Provider,
 		"mcp_servers", len(cfg.MCPServers),
 	)
 
 	// Semantic health probe runs in the background on :8080.
-	go ServeHealthProbe(":8080", runner, cfg.ValidatorPrompt)
+	go health.ServeProbe(":8080", r, cfg.ValidatorPrompt)
 
 	// Poll the task queue until shutdown.
 	for {
@@ -57,7 +70,7 @@ func main() {
 		default:
 		}
 
-		task, err := queue.Poll(ctx)
+		task, err := q.Poll(ctx)
 		if err != nil {
 			logger.Error("queue poll error", "error", err)
 			continue
@@ -66,18 +79,21 @@ func main() {
 			continue
 		}
 
-		go func(t Task) {
-			taskCtx, taskCancel := context.WithTimeout(ctx, TaskTimeout(cfg))
+		go func(t queue.Task) {
+			taskCtx, taskCancel := context.WithTimeout(ctx, config.TaskTimeout(cfg))
 			defer taskCancel()
 
-			result, err := runner.RunTask(taskCtx, t)
+			result, usage, err := r.RunTask(taskCtx, t)
 			if err != nil {
 				logger.Error("task failed", "task_id", t.ID, "error", err)
-				queue.Nack(t, err.Error())
+				q.Nack(t, err.Error())
 				return
 			}
-			logger.Info("task completed", "task_id", t.ID)
-			queue.Ack(t.ID, result)
+			logger.Info("task completed", "task_id", t.ID,
+				"input_tokens", usage.InputTokens,
+				"output_tokens", usage.OutputTokens,
+			)
+			q.Ack(t.ID, result, usage)
 		}(*task)
 	}
 }
