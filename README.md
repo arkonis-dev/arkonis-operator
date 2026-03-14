@@ -31,7 +31,7 @@ CronJob / Ingress   →   ArkEvent
 
 | Resource      | What it does                                                                                             |
 | ------------- | -------------------------------------------------------------------------------------------------------- |
-| `ArkAgent`    | A pool of agent replicas backed by a model, system prompt, and optional MCP tool servers                 |
+| `ArkAgent`    | A pool of agent replicas backed by a model, system prompt (inline or from a ConfigMap/Secret), and optional MCP tool servers |
 | `ArkService`  | Routes tasks to available agent instances (round-robin, least-busy, random)                              |
 | `ArkSettings` | Reusable config shared across agents: temperature, output format, prompt fragments                       |
 | `ArkFlow`     | A DAG of agent steps. Outputs of one step feed into the next. Supports conditionals, loops, and timeouts |
@@ -44,14 +44,35 @@ CronJob / Ingress   →   ArkEvent
 
 A research agent that fires on a webhook, runs a two-step pipeline, and caps daily spend:
 
+System prompts can be inline or loaded from a file — useful when your instructions are long enough to live in their own file:
+
 ```yaml
+# prompts/researcher.md (tracked in git, referenced by name)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: researcher-prompt
+data:
+  prompt.md: |
+    You are a research agent working inside a Kubernetes cluster.
+    Your job is to gather accurate, well-cited information on the topic you are given.
+
+    Guidelines:
+    - Always cite primary sources when available.
+    - Prefer recent publications (last 2 years).
+    - If you are uncertain, say so explicitly rather than guessing.
+    - Keep responses concise: facts over prose.
+---
 apiVersion: arkonis.dev/v1alpha1
 kind: ArkAgent
 metadata:
   name: researcher
 spec:
   model: claude-sonnet-4-20250514
-  systemPrompt: You are a research agent. Be concise and cite sources.
+  systemPromptRef:
+    configMapKeyRef:
+      name: researcher-prompt
+      key: prompt.md
   limits:
     maxDailyTokens: 500000 # scales to 0 when the 24h window is exhausted
 ---
