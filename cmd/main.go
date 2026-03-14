@@ -103,7 +103,9 @@ func buildWebhookServerOptions(tlsOpts []func(*tls.Config), certPath, certName, 
 	return opts
 }
 
-func buildMetricsServerOptions(bindAddr string, tlsOpts []func(*tls.Config), secureMetrics bool, certPath, certName, certKey string) metricsserver.Options {
+func buildMetricsServerOptions(
+	bindAddr string, tlsOpts []func(*tls.Config), secureMetrics bool, certPath, certName, certKey string,
+) metricsserver.Options {
 	opts := metricsserver.Options{
 		BindAddress:   bindAddr,
 		SecureServing: secureMetrics,
@@ -167,8 +169,10 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	tlsOpts = buildTLSOptions(enableHTTP2)
-	webhookServer := webhook.NewServer(buildWebhookServerOptions(tlsOpts, webhookCertPath, webhookCertName, webhookCertKey))
-	metricsServerOptions := buildMetricsServerOptions(metricsAddr, tlsOpts, secureMetrics, metricsCertPath, metricsCertName, metricsCertKey)
+	webhookServer := webhook.NewServer(
+		buildWebhookServerOptions(tlsOpts, webhookCertPath, webhookCertName, webhookCertKey))
+	metricsServerOptions := buildMetricsServerOptions(
+		metricsAddr, tlsOpts, secureMetrics, metricsCertPath, metricsCertName, metricsCertKey)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
