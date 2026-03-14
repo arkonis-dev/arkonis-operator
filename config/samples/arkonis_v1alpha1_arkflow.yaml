@@ -33,7 +33,7 @@ spec:
       dependsOn:
         - research
       # Only runs when the caller requested a detailed report.
-      if: "{{ eq .pipeline.input.detailed \"true\" }}"
+      if: '{{ eq .pipeline.input.detailed "true" }}'
       inputs:
         prompt: "Expand on these research findings with deeper analysis:\n\n{{ .steps.research.data.summary }}"
 
@@ -55,7 +55,7 @@ spec:
         }
       loop:
         # Keep iterating while confidence is below threshold.
-        condition: "{{ lt (index .steps.refine.data \"confidence\") 0.8 }}"
+        condition: '{{ lt (index .steps.refine.data "confidence") 0.8 }}'
         maxIterations: 3
 
     # Step 4 — final summarisation after all prior steps complete.

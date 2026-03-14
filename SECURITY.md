@@ -4,7 +4,7 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 0.x.x   | ✅ |
+| 0.x.x   | ✅        |
 
 This project is in active development. Only the latest release receives security updates.
 

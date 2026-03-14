@@ -7,15 +7,15 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: arkevent-admin-role
 rules:
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arkevents
-  verbs:
-  - '*'
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arkevents/status
-  verbs:
-  - get
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arkevents
+    verbs:
+      - "*"
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arkevents/status
+    verbs:
+      - get

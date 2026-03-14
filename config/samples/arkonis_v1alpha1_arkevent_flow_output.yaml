@@ -7,8 +7,8 @@ spec:
   source:
     type: pipeline-output
     pipelineOutput:
-      name: etl-pipeline     # watch this ArkFlow
-      onPhase: Succeeded     # fire when it succeeds (default)
+      name: etl-pipeline # watch this ArkFlow
+      onPhase: Succeeded # fire when it succeeds (default)
   targets:
     - pipeline: analytics-pipeline
       input:

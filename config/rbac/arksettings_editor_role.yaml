@@ -7,21 +7,21 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: arksettings-editor-role
 rules:
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arksettings
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arksettings/status
-  verbs:
-  - get
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arksettings
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arksettings/status
+    verbs:
+      - get

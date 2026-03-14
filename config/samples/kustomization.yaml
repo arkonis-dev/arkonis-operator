@@ -1,11 +1,11 @@
 ## Append samples of your project ##
 resources:
-- arkonis_v1alpha1_arkagent.yaml
-- arkonis_v1alpha1_arkservice.yaml
-- arkonis_v1alpha1_arksettings.yaml
-- arkonis_v1alpha1_arkflow.yaml
-- arkonis_v1alpha1_arkmemory.yaml
-- arkonis_v1alpha1_arkevent_cron.yaml
-- arkonis_v1alpha1_arkevent_webhook.yaml
-- arkonis_v1alpha1_arkevent_flow_output.yaml
+  - arkonis_v1alpha1_arkagent.yaml
+  - arkonis_v1alpha1_arkservice.yaml
+  - arkonis_v1alpha1_arksettings.yaml
+  - arkonis_v1alpha1_arkflow.yaml
+  - arkonis_v1alpha1_arkmemory.yaml
+  - arkonis_v1alpha1_arkevent_cron.yaml
+  - arkonis_v1alpha1_arkevent_webhook.yaml
+  - arkonis_v1alpha1_arkevent_flow_output.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

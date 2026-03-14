@@ -7,15 +7,15 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: arksettings-admin-role
 rules:
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arksettings
-  verbs:
-  - '*'
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arksettings/status
-  verbs:
-  - get
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arksettings
+    verbs:
+      - "*"
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arksettings/status
+    verbs:
+      - get

@@ -1,47 +1,132 @@
 # ark-operator
 
-> Kubernetes-native AI agent infrastructure. Deploy, scale, and manage agentic workloads the same way you manage any other workload.
-
 [![GitHub release](https://img.shields.io/github/v/release/arkonis-dev/ark-operator)](https://github.com/arkonis-dev/ark-operator/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/arkonis-dev/ark-operator)](https://goreportcard.com/report/github.com/arkonis-dev/ark-operator)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](./LICENSE)
 [![Lint](https://github.com/arkonis-dev/ark-operator/actions/workflows/lint.yml/badge.svg)](https://github.com/arkonis-dev/ark-operator/actions/workflows/lint.yml)
 [![Tests](https://github.com/arkonis-dev/ark-operator/actions/workflows/test.yml/badge.svg)](https://github.com/arkonis-dev/ark-operator/actions/workflows/test.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/arkonis-dev/ark-operator)](https://goreportcard.com/report/github.com/arkonis-dev/ark-operator)
-[![Go version](https://img.shields.io/github/go-mod/go-version/arkonis-dev/ark-operator)](./go.mod)
-[![GitHub stars](https://img.shields.io/github/stars/arkonis-dev/ark-operator?style=social)](https://github.com/arkonis-dev/ark-operator/stargazers)
 
-ark-operator extends Kubernetes with AI agents as first-class resources. Declare an agent with a model, system prompt, and MCP tool servers — the operator handles scheduling, scaling, and semantic health checks. Everything else works exactly like standard Kubernetes: GitOps, RBAC, namespaces, `kubectl`.
+**AI agents as Kubernetes resources.** `ArkAgent` is to an LLM agent what `Deployment` is to a container: declare it, and the operator handles scheduling, scaling, health checks, and cost limits.
+
+---
+
+## The idea
+
+Running agents in production means solving the same problems you already solved for services: _how many instances are running, are they healthy, how do I roll out a change, who can deploy to production?_
+
+ark-operator doesn't reinvent that. It extends Kubernetes so your agents live alongside everything else: same GitOps pipeline, same RBAC, same `kubectl`.
+
+```text
+container image     →   model + system prompt + MCP tools
+Deployment          →   ArkAgent
+Service             →   ArkService
+ConfigMap           →   ArkSettings
+CronJob / Ingress   →   ArkEvent
+(no equivalent)     →   ArkFlow  (multi-step agent pipeline)
+```
+
+---
+
+## Resources
+
+| Resource      | What it does                                                                                             |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| `ArkAgent`    | A pool of agent replicas backed by a model, system prompt, and optional MCP tool servers                 |
+| `ArkService`  | Routes tasks to available agent instances (round-robin, least-busy, random)                              |
+| `ArkSettings` | Reusable config shared across agents: temperature, output format, prompt fragments                       |
+| `ArkFlow`     | A DAG of agent steps. Outputs of one step feed into the next. Supports conditionals, loops, and timeouts |
+| `ArkEvent`    | Fires flows on a schedule or HTTP webhook. One event can fan out to multiple flows in parallel           |
+| `ArkMemory`   | Attaches a memory backend (in-context, Redis, or vector store) to an agent                               |
+
+---
+
+## Example
+
+A research agent that fires on a webhook, runs a two-step pipeline, and caps daily spend:
+
+```yaml
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkAgent
+metadata:
+  name: researcher
+spec:
+  model: claude-sonnet-4-20250514
+  systemPrompt: You are a research agent. Be concise and cite sources.
+  limits:
+    maxDailyTokens: 500000 # scales to 0 when the 24h window is exhausted
+---
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkFlow
+metadata:
+  name: research-pipeline-template
+spec:
+  steps:
+    - name: research
+      arkAgent: researcher
+      prompt: "Research this topic: {{ .input.topic }}"
+    - name: summarize
+      arkAgent: researcher
+      dependsOn: [research]
+      prompt: "Summarize in 3 bullet points: {{ .steps.research.output }}"
+  output: "{{ .steps.summarize.output }}"
+---
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkEvent
+metadata:
+  name: research-trigger
+spec:
+  type: webhook
+  targets:
+    - pipeline: research-pipeline-template
+```
+
+Fire it from anywhere:
 
 ```bash
-kubectl apply -f research-agent.yaml
-# arkagent.arkonis.dev/research-agent created
+# Get the webhook URL and token the operator generated
+WEBHOOK_URL=$(kubectl get arkevent research-trigger -o jsonpath='{.status.webhookURL}')
+TOKEN=$(kubectl get secret arkevent-research-trigger-token -o jsonpath='{.data.token}' | base64 -d)
 
-kubectl get arkagents
-# NAME              MODEL                      REPLICAS   READY   AGE
-# research-agent    claude-sonnet-4-20250514   5          5       2m
+curl -X POST "$WEBHOOK_URL/fire" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input": {"topic": "Kubernetes operator patterns"}}'
+
+# Watch it run
+kubectl get arkflows -w
+# NAME                              PHASE     TOKENS   STARTED   COMPLETED
+# research-pipeline-20250314-abc1   Running   0        5s
+# research-pipeline-20250314-abc1   Succeeded 1842     8s        12s
 ```
+
+---
 
 ## Install
 
-**Prerequisites:** Kubernetes 1.31+, kubectl
+**Prerequisites:** Kubernetes 1.31+, Redis (for the task queue)
 
 ```bash
 # 1. Install the operator
 kubectl apply -f https://github.com/arkonis-dev/ark-operator/releases/latest/download/install.yaml
 
-# 2. Deploy Redis task queue
+# 2. Deploy Redis
 kubectl apply -f https://raw.githubusercontent.com/arkonis-dev/ark-operator/main/config/prereqs/redis.yaml
 
 # 3. Create the API key secret (one per namespace)
 kubectl create secret generic arkonis-api-keys \
   --from-literal=ANTHROPIC_API_KEY=sk-ant-... \
   --from-literal=TASK_QUEUE_URL=redis.agent-infra.svc.cluster.local:6379
+```
 
-# 4. Deploy your first agent
-kubectl apply -f https://raw.githubusercontent.com/arkonis-dev/ark-operator/main/config/samples/arkonis_v1alpha1_arkondeployment.yaml
+For a full working example with agents, flows, and a webhook trigger in one apply:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/arkonis-dev/ark-operator-example/main/quickstart.yaml
 ```
 
 Full documentation: **[arkonis.dev](https://arkonis.dev)**
+
+---
 
 ## Contributing
 
@@ -49,4 +134,4 @@ Contributions welcome. Open an issue before starting significant work. See [CONT
 
 ## License
 
-Apache 2.0 — see [LICENSE](./LICENSE)
+Apache 2.0: see [LICENSE](./LICENSE)

@@ -11,12 +11,12 @@ Thank you for your interest in contributing. This document covers how to get sta
 
 **Prerequisites**
 
-| Tool | Version |
-|---|---|
-| Go | 1.25+ (see `go.mod`) |
-| kubectl | 1.31+ |
-| kind or k3d | latest |
-| kubebuilder | v4 |
+| Tool        | Version              |
+| ----------- | -------------------- |
+| Go          | 1.25+ (see `go.mod`) |
+| kubectl     | 1.31+                |
+| kind or k3d | latest               |
+| kubebuilder | v4                   |
 
 ```bash
 # 1. Clone

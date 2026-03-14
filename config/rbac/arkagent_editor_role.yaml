@@ -7,21 +7,21 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: arkagent-editor-role
 rules:
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arkagents
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arkagents/status
-  verbs:
-  - get
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arkagents
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arkagents/status
+    verbs:
+      - get

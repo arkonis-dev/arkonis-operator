@@ -7,17 +7,17 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: arksettings-viewer-role
 rules:
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arksettings
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arksettings/status
-  verbs:
-  - get
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arksettings
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arksettings/status
+    verbs:
+      - get

@@ -7,15 +7,15 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: arkflow-admin-role
 rules:
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arkflows
-  verbs:
-  - '*'
-- apiGroups:
-  - arkonis.dev
-  resources:
-  - arkflows/status
-  verbs:
-  - get
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arkflows
+    verbs:
+      - "*"
+  - apiGroups:
+      - arkonis.dev
+    resources:
+      - arkflows/status
+    verbs:
+      - get
