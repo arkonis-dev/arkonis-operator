@@ -294,11 +294,15 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
-	@test -f .custom-gcl.yml && { \
-		echo "Building custom golangci-lint with plugins..." && \
-		$(GOLANGCI_LINT) custom --destination $(LOCALBIN) --name golangci-lint-custom && \
-		mv -f $(LOCALBIN)/golangci-lint-custom $(GOLANGCI_LINT); \
-	} || true
+	@if [ -f .custom-gcl.yml ]; then \
+		STAMP="$(LOCALBIN)/.golangci-lint-custom-$(GOLANGCI_LINT_VERSION)"; \
+		if [ ! -f "$$STAMP" ]; then \
+			echo "Building custom golangci-lint with plugins..."; \
+			"$(GOLANGCI_LINT)-$(GOLANGCI_LINT_VERSION)" custom --destination $(LOCALBIN) --name golangci-lint-custom; \
+			mv -f "$(LOCALBIN)/golangci-lint-custom" "$(GOLANGCI_LINT)-$(GOLANGCI_LINT_VERSION)"; \
+			touch "$$STAMP"; \
+		fi; \
+	fi
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary

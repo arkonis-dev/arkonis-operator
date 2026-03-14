@@ -31,6 +31,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Cache golangci-lint binary
+        uses: actions/cache@v4
+        with:
+          path: bin/
+          key: golangci-lint-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'Makefile') }}
+
       - name: Check linter configuration
         run: make lint-config
       - name: Run linter
