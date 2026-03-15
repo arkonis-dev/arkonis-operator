@@ -67,10 +67,11 @@ func New(name string) (LLMProvider, error) {
 // Detect returns the provider name for a given model ID.
 // It inspects the model string prefix to infer the backend:
 //
-//	claude-*          → anthropic
+//	claude-*             → anthropic
 //	gpt-*, o1*, o3*, o4* → openai
 //
-// Falls back to "anthropic" for unrecognised models.
+// Falls back to "openai" for unrecognised models so that any
+// OpenAI-compatible endpoint (e.g. Ollama) works out of the box.
 func Detect(model string) string {
 	switch {
 	case strings.HasPrefix(model, "claude-"):
@@ -81,6 +82,6 @@ func Detect(model string) string {
 		strings.HasPrefix(model, "o4"):
 		return "openai"
 	default:
-		return "anthropic"
+		return "openai"
 	}
 }
