@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	arkonisv1alpha1 "github.com/arkonis-dev/ark-operator/api/v1alpha1"
+	"github.com/arkonis-dev/ark-operator/internal/flow"
 )
 
 var _ = Describe("ArkFlow Controller", func() {
@@ -241,7 +242,7 @@ var _ = Describe("ArkFlow Controller", func() {
 var _ = Describe("isTruthy", func() {
 	DescribeTable("evaluates strings correctly",
 		func(input string, expected bool) {
-			Expect(isTruthy(input)).To(Equal(expected))
+			Expect(flow.IsTruthy(input)).To(Equal(expected))
 		},
 		Entry("empty string is falsy", "", false),
 		Entry("false is falsy", "false", false),
@@ -256,72 +257,70 @@ var _ = Describe("isTruthy", func() {
 	)
 })
 
-var _ = Describe("ArkFlowReconciler unit tests", func() {
-	r := &ArkFlowReconciler{}
-
-	Describe("validateDAG", func() {
+var _ = Describe("flow package unit tests", func() {
+	Describe("ValidateDAG", func() {
 		It("passes a valid linear DAG", func() {
-			flow := flowWithSteps(
+			f := flowWithSteps(
 				flowStep("a", nil),
 				flowStep("b", []string{"a"}),
 				flowStep("c", []string{"b"}),
 			)
-			Expect(r.validateDAG(flow)).To(Succeed())
+			Expect(flow.ValidateDAG(f)).To(Succeed())
 		})
 
 		It("rejects an unknown dependsOn", func() {
-			flow := flowWithSteps(flowStep("a", []string{"ghost"}))
-			Expect(r.validateDAG(flow)).To(MatchError(ContainSubstring("ghost")))
+			f := flowWithSteps(flowStep("a", []string{"ghost"}))
+			Expect(flow.ValidateDAG(f)).To(MatchError(ContainSubstring("ghost")))
 		})
 
 		It("detects a direct cycle", func() {
-			flow := flowWithSteps(
+			f := flowWithSteps(
 				flowStep("a", []string{"b"}),
 				flowStep("b", []string{"a"}),
 			)
-			Expect(r.validateDAG(flow)).To(MatchError(ContainSubstring("cycle")))
+			Expect(flow.ValidateDAG(f)).To(MatchError(ContainSubstring("cycle")))
 		})
 
 		It("detects a three-node cycle", func() {
-			flow := flowWithSteps(
+			f := flowWithSteps(
 				flowStep("a", []string{"c"}),
 				flowStep("b", []string{"a"}),
 				flowStep("c", []string{"b"}),
 			)
-			Expect(r.validateDAG(flow)).To(MatchError(ContainSubstring("cycle")))
+			Expect(flow.ValidateDAG(f)).To(MatchError(ContainSubstring("cycle")))
 		})
 	})
 
-	Describe("depsSucceeded", func() {
+	Describe("DepsSucceeded", func() {
 		It("returns true when all deps are Succeeded", func() {
 			statusByName := map[string]*arkonisv1alpha1.ArkFlowStepStatus{
 				"a": {Phase: arkonisv1alpha1.ArkFlowStepPhaseSucceeded},
 			}
-			Expect(r.depsSucceeded([]string{"a"}, statusByName)).To(BeTrue())
+			Expect(flow.DepsSucceeded([]string{"a"}, statusByName)).To(BeTrue())
 		})
 
 		It("returns true when a dep is Skipped", func() {
 			statusByName := map[string]*arkonisv1alpha1.ArkFlowStepStatus{
 				"a": {Phase: arkonisv1alpha1.ArkFlowStepPhaseSkipped},
 			}
-			Expect(r.depsSucceeded([]string{"a"}, statusByName)).To(BeTrue())
+			Expect(flow.DepsSucceeded([]string{"a"}, statusByName)).To(BeTrue())
 		})
 
 		It("returns false when a dep is still Running", func() {
 			statusByName := map[string]*arkonisv1alpha1.ArkFlowStepStatus{
 				"a": {Phase: arkonisv1alpha1.ArkFlowStepPhaseRunning},
 			}
-			Expect(r.depsSucceeded([]string{"a"}, statusByName)).To(BeFalse())
+			Expect(flow.DepsSucceeded([]string{"a"}, statusByName)).To(BeFalse())
 		})
 
 		It("returns false when a dep is missing from status", func() {
-			Expect(r.depsSucceeded([]string{"missing"}, map[string]*arkonisv1alpha1.ArkFlowStepStatus{})).To(BeFalse())
+			Expect(flow.DepsSucceeded([]string{"missing"}, map[string]*arkonisv1alpha1.ArkFlowStepStatus{})).To(BeFalse())
 		})
 	})
 
-	Describe("evaluateLoops", func() {
+	Describe("EvaluateLoops", func() {
 		It("resets a Succeeded loop step to Pending when condition is truthy", func() {
-			flow := flowWithSteps(arkonisv1alpha1.ArkFlowStep{
+			f := flowWithSteps(arkonisv1alpha1.ArkFlowStep{
 				Name:     "collect",
 				ArkAgent: "agent",
 				Loop:     &arkonisv1alpha1.LoopSpec{Condition: "true", MaxIterations: 3},
@@ -331,14 +330,14 @@ var _ = Describe("ArkFlowReconciler unit tests", func() {
 				Phase: arkonisv1alpha1.ArkFlowStepPhaseSucceeded,
 			}
 			statusByName := map[string]*arkonisv1alpha1.ArkFlowStepStatus{"collect": st}
-			r.evaluateLoops(flow, statusByName, map[string]any{})
+			flow.EvaluateLoops(f, statusByName, map[string]any{})
 
 			Expect(st.Phase).To(Equal(arkonisv1alpha1.ArkFlowStepPhasePending))
 			Expect(st.Iterations).To(Equal(1))
 		})
 
 		It("leaves a Succeeded step as-is when condition is falsy", func() {
-			flow := flowWithSteps(arkonisv1alpha1.ArkFlowStep{
+			f := flowWithSteps(arkonisv1alpha1.ArkFlowStep{
 				Name:     "collect",
 				ArkAgent: "agent",
 				Loop:     &arkonisv1alpha1.LoopSpec{Condition: "false", MaxIterations: 3},
@@ -348,13 +347,13 @@ var _ = Describe("ArkFlowReconciler unit tests", func() {
 				Phase: arkonisv1alpha1.ArkFlowStepPhaseSucceeded,
 			}
 			statusByName := map[string]*arkonisv1alpha1.ArkFlowStepStatus{"collect": st}
-			r.evaluateLoops(flow, statusByName, map[string]any{})
+			flow.EvaluateLoops(f, statusByName, map[string]any{})
 
 			Expect(st.Phase).To(Equal(arkonisv1alpha1.ArkFlowStepPhaseSucceeded))
 		})
 
 		It("stops looping after MaxIterations", func() {
-			flow := flowWithSteps(arkonisv1alpha1.ArkFlowStep{
+			f := flowWithSteps(arkonisv1alpha1.ArkFlowStep{
 				Name:     "collect",
 				ArkAgent: "agent",
 				Loop:     &arkonisv1alpha1.LoopSpec{Condition: "true", MaxIterations: 2},
@@ -365,16 +364,16 @@ var _ = Describe("ArkFlowReconciler unit tests", func() {
 				Iterations: 2, // already at max
 			}
 			statusByName := map[string]*arkonisv1alpha1.ArkFlowStepStatus{"collect": st}
-			r.evaluateLoops(flow, statusByName, map[string]any{})
+			flow.EvaluateLoops(f, statusByName, map[string]any{})
 
 			Expect(st.Phase).To(Equal(arkonisv1alpha1.ArkFlowStepPhaseSucceeded))
 		})
 	})
 
-	Describe("updateFlowPhase — timeout", func() {
+	Describe("UpdateFlowPhase — timeout", func() {
 		It("fails the flow when TimeoutSeconds has elapsed", func() {
 			past := metav1.NewTime(metav1.Now().Add(-600 * 1e9)) // 600s ago
-			flow := &arkonisv1alpha1.ArkFlow{
+			f := &arkonisv1alpha1.ArkFlow{
 				Spec: arkonisv1alpha1.ArkFlowSpec{
 					TimeoutSeconds: 300,
 				},
@@ -386,17 +385,17 @@ var _ = Describe("ArkFlowReconciler unit tests", func() {
 					},
 				},
 			}
-			r.updateFlowPhase(flow, map[string]any{})
+			flow.UpdateFlowPhase(f, map[string]any{})
 
-			Expect(flow.Status.Phase).To(Equal(arkonisv1alpha1.ArkFlowPhaseFailed))
-			cond := apimeta.FindStatusCondition(flow.Status.Conditions, "Ready")
+			Expect(f.Status.Phase).To(Equal(arkonisv1alpha1.ArkFlowPhaseFailed))
+			cond := apimeta.FindStatusCondition(f.Status.Conditions, "Ready")
 			Expect(cond).NotTo(BeNil())
 			Expect(cond.Reason).To(Equal("TimedOut"))
 		})
 
 		It("does not fail the flow when within timeout", func() {
 			now := metav1.Now()
-			flow := &arkonisv1alpha1.ArkFlow{
+			f := &arkonisv1alpha1.ArkFlow{
 				Spec: arkonisv1alpha1.ArkFlowSpec{
 					TimeoutSeconds: 3600,
 				},
@@ -408,9 +407,9 @@ var _ = Describe("ArkFlowReconciler unit tests", func() {
 					},
 				},
 			}
-			r.updateFlowPhase(flow, map[string]any{})
+			flow.UpdateFlowPhase(f, map[string]any{})
 
-			Expect(flow.Status.Phase).To(Equal(arkonisv1alpha1.ArkFlowPhaseRunning))
+			Expect(f.Status.Phase).To(Equal(arkonisv1alpha1.ArkFlowPhaseRunning))
 		})
 	})
 })
