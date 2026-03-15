@@ -27,11 +27,13 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
 
-      - name: Run chart-releaser
+      - name: Publish chart to gh-pages
         uses: helm/chart-releaser-action@v1.6.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         with:
           charts_dir: charts
-          # Publishes index.yaml to the gh-pages branch of this repo.
+          packages_with_index: true
+          # Packages and index.yaml are stored in the gh-pages branch.
+          # No GitHub releases are created.
           # Helm repo URL: https://arkonis-dev.github.io/ark-operator
