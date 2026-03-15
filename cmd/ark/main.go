@@ -51,6 +51,7 @@ with kubectl apply -f when you are ready to deploy.`,
 	}
 	root.AddCommand(runCmd())
 	root.AddCommand(validateCmd())
+	root.AddCommand(initCmd())
 	return root
 }
 
@@ -305,6 +306,104 @@ func printText(f *arkonisv1alpha1.ArkFlow, elapsed time.Duration) error {
 	}
 	return nil
 }
+
+// initCmd returns the `ark init` subcommand.
+func initCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "init <project>",
+		Short: "Scaffold a new ark project",
+		Long: `Create a new directory with a ready-to-run ArkFlow project.
+
+The generated project contains:
+  quickstart.yaml   — ArkAgent + ArkFlow definition
+  .env.example      — required environment variables
+  docker-compose.yml — local Redis for task queue
+
+Examples:
+  ark init my-agent
+  cd my-agent && ark run quickstart.yaml --provider mock`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return initProject(args[0])
+		},
+	}
+}
+
+func initProject(name string) error {
+	if _, err := os.Stat(name); err == nil {
+		return fmt.Errorf("directory %q already exists", name)
+	}
+	if err := os.MkdirAll(name, 0755); err != nil {
+		return err
+	}
+
+	files := map[string]string{
+		"quickstart.yaml":    initQuickstartYAML(name),
+		".env.example":       initEnvExample,
+		"docker-compose.yml": initDockerCompose,
+	}
+	for filename, content := range files {
+		path := fmt.Sprintf("%s/%s", name, filename)
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			return err
+		}
+	}
+
+	fmt.Printf("Created project %q\n\n", name)
+	fmt.Println("Next steps:")
+	fmt.Printf("  cd %s\n", name)
+	fmt.Println("  ark run quickstart.yaml --provider mock --watch")
+	fmt.Println("  ark run quickstart.yaml --provider anthropic --watch")
+	return nil
+}
+
+func initQuickstartYAML(name string) string {
+	return fmt.Sprintf(`apiVersion: arkonis.dev/v1alpha1
+kind: ArkAgent
+metadata:
+  name: %s-agent
+spec:
+  model: claude-sonnet-4-20250514
+  systemPrompt: |
+    You are a helpful assistant. Answer questions clearly and concisely.
+  limits:
+    maxTokensPerCall: 4000
+    timeoutSeconds: 60
+---
+apiVersion: arkonis.dev/v1alpha1
+kind: ArkFlow
+metadata:
+  name: %s-flow
+spec:
+  input:
+    question: "What is a Kubernetes operator?"
+  steps:
+    - name: answer
+      arkAgent: %s-agent
+      inputs:
+        prompt: "{{ .pipeline.input.question }}"
+  output: "{{ .steps.answer.output }}"
+`, name, name, name)
+}
+
+const initEnvExample = `# Copy this file to .env and fill in your API keys.
+
+# Required: LLM provider API key.
+ANTHROPIC_API_KEY=sk-ant-...
+# OPENAI_API_KEY=sk-...
+
+# Required for Kubernetes deployments (not needed for ark run locally).
+TASK_QUEUE_URL=redis.ark-system.svc.cluster.local:6379
+`
+
+const initDockerCompose = `# Local Redis for task queue — used when running the operator in a cluster.
+# Not required for ark run locally.
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+`
 
 func printJSON(f *arkonisv1alpha1.ArkFlow, elapsed time.Duration) error {
 	type stepOut struct {
