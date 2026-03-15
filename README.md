@@ -47,6 +47,8 @@ No cluster required. Same YAML, same output.
 ```bash
 go install github.com/arkonis-dev/ark-operator/cmd/ark@latest
 
+ark init my-agent
+cd my-agent
 ark run quickstart.yaml --provider mock --watch
 ark run quickstart.yaml --provider anthropic --watch
 ark validate quickstart.yaml
